@@ -1,0 +1,6 @@
+venv/
+.vscode/
+.env
+src/temp.mp3
+src/help
+src/__pycache__
