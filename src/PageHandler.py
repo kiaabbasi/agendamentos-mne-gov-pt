@@ -9,7 +9,33 @@ import time
 import requests
 import voice_to_text , CDP_Contoroler , screen_handeler
 import pyautogui
-from setings import basepath
+from setings import basepath,PageHandlerSetting
+from typing import Dict
+import random
+import logging
+
+class API():
+    base_url = PageHandlerSetting.API_BASE_URL
+    sicret_key= PageHandlerSetting.secret_key
+    @staticmethod
+    def send_reult_to_server(txt:str):
+        url = API.base_url +"send"
+        logging.debug(f"requesting {url}/{txt}")
+        params = {
+            "message": f"{txt}"
+        }
+
+        headers = {
+            "x-api-key": f"{API.sicret_key}"
+        }
+
+        response = requests.get(url, params=params, headers=headers)
+
+        rs=response.json()
+        
+        return rs["status"]==200
+        
+
 class User:
     def __init__(self,username,password,consular_post,category_of_consular_act,consular_act) -> None:
         self.username = username
@@ -26,7 +52,6 @@ class PageHandeler():
         self.user = user
                 
     def page1(self):
-        self.wdriver.get("https://agendamentos.mne.gov.pt/en/login")
 
         WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH, "/html/body/div[1]/div/main/div/div[2]/div/div[3]/div[2]"))).click() #Go to login with
         try :
@@ -35,16 +60,29 @@ class PageHandeler():
             logging.warning("Acsept Coockie field is not defind")
 
         time.sleep(2)
+        logging.debug("typing username...")
         self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/div[2]/div/form/div[1]/div/input').send_keys(self.user.username)#user name fild
         time.sleep(1)
+        logging.debug("typing passwrod...")
         self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/div[2]/div/form/div[2]/div/input').send_keys(self.user.password)#password fild
+        logging.debug("handleing captcha...")
         solve_captcha()
         time.sleep(1)
-        self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/div[2]/div/form/div[5]/button').click() # login button
-    def page2(self):
-        WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/div[2]/div/a[1]'))).click() #Click on Consular Post
+        logging.debug("Clicking on Next button...")
+        WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="main"]/div/div[2]/div/form/div[5]/button'))).click()# login button
+       
+    def page2(self):#https://agendamentos.mne.gov.pt/en/schedule
+        WebDriverWait(self.wdriver,15).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/div[2]/div/a[1]'))).click() #Click on Consular Post
 
     def page3(self):
+        def captcha_solved_check()->bool:
+            try:
+                if self.wdriver.current_url == "https://agendamentos.mne.gov.pt/en/schedule/form/consular":
+                    e =self.wdriver.find_element(By.XPATH,"/html/body/div[1]/div/div/main/div/section[3]/div/form/section/article[4]")
+                    
+                return False
+            except selex.NoSuchElementException :
+                return True
         WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/section[3]/div/form/section/article[1]/div/div/button'))).click() #Click on Consular Post
         elements = self.wdriver.find_elements(
             By.CSS_SELECTOR,
@@ -82,8 +120,8 @@ class PageHandeler():
                 break
         
         
-        time.sleep(1)
-        solve_captcha()
+        time.sleep(1.5)
+        solve_captcha(break_if_true=captcha_solved_check)
         time.sleep(1)
        
         WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/section[3]/div/form/div/button[2]'))).click() #Next button
@@ -96,13 +134,56 @@ class PageHandeler():
         else :
             raise ValueError("Wrong elemnt found")
 
-    def page5(self):
+    def page5(self,deley_start,deley_end,register =False):
+        #TODO complet this
+        rtn=[]
+        if deley_start > deley_end or deley_start<0:
+            raise ValueError("deley_start must be smaler than deley_end")
         
-       
-        pass
-def solve_captcha():
+        previous_month = WebDriverWait(self.wdriver,10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="main"]/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[2]/button[1]')))[0] #previous-month
+        next_month = WebDriverWait(self.wdriver,10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="main"]/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[2]/button[2]')))[0] #next-month
+        going_forward = True
+        while True :
+            dict_result:Dict={"user_registered":False}
+            
+            month_and_year=self.wdriver.find_element(By.XPATH,'/html/body/div[1]/div/div/main/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[1]').text
+            dict_result["month_and_year"] =month_and_year
+            
+            all_dates= self.wdriver.find_elements(By.CSS_SELECTOR,'button[name="day"]:not([disabled])')
+            days=[h.text for h in all_dates]
+            dict_result["days"] = days
+            if len(days) > 0:
+                API.send_reult_to_server(f"🟢{month_and_year}\n{days}")
+            else :
+                API.send_reult_to_server(f"🔴{month_and_year} No Day availble")
+            if register:
+                # Click first date avalble
+                all_dates[0].click()    
+                WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.NAME, 'hour-slot'))).click() # Hour
+                
+                self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/section[3]/section/form/div[2]/button[2]').click()
+                dict_result["user_registered"] = True
+                API.send_reult_to_server(f"{self.user.username} has ben registerd on {month_and_year}-{all_dates[0]}")
+                break
+            
+            if going_forward and  next_month.get_attribute("disabled") !="true":
+                next_month.click()
+            elif not going_forward and previous_month.get_attribute("disabled") !="true":
+                previous_month.click()
+                
+            else :
+                going_forward = not going_forward            
+            
+            time.sleep(random.randint(deley_start,deley_end))
+            
+            rtn.append(dict_result)
+        return rtn
+            
+
+
+def solve_captcha(*args, **kwargs):
     
-    captcha_is_not_solved= screen_handeler.click_captcha_buttons()
+    captcha_is_not_solved= screen_handeler.click_captcha_buttons(*args, **kwargs)
     if captcha_is_not_solved:
         time.sleep(1)
     
@@ -127,3 +208,5 @@ def solve_captcha():
         time.sleep(1)
         rs= screen_handeler.find_object_on_screen(f"{basepath}assets/verify.png")
         screen_handeler.click_on_object(rs[0],rs[1])
+        
+logging.getLogger().setLevel(logging.DEBUG)

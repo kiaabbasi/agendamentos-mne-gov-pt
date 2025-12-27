@@ -1,16 +1,28 @@
 from selenium  import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
+import logging 
 
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 import time
-import CDP_Contoroler,PageHandler
-import logging 
+import CDP_Contoroler
+import PageHandler
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+logging.getLogger().setLevel(logging.WARNING)
+logger = logging.getLogger("__main__")
+logger.setLevel(logging.DEBUG)
+
+# هندلر مستقل برای __main__
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+logger.propagate = False
 logger.info("App Started")
-
 
 
         
@@ -92,16 +104,25 @@ if __name__ == "__main__":
             )
         page_handeler = PageHandler.PageHandeler(u,driver)
         
-        page_handeler.page1()
-        time.sleep(1)
+        driver.get("https://agendamentos.mne.gov.pt/en/login")
+        #https://agendamentos.mne.gov.pt/en/login?type=session_expired
+        if  driver.current_url =="https://agendamentos.mne.gov.pt/en/login":
+            page_handeler.page1()
+            time.sleep(1)
+            
+       
         page_handeler.page2()
         time.sleep(1)
         page_handeler.page3()
         time.sleep(1)
         page_handeler.page4()
+        time.sleep(1)
+        r= page_handeler.page5(5,10,False)
+        PageHandler.API.send_reult_to_server(str(r))
         
         input("the end")
     finally : 
         if driver != None:
-            driver.quit()
+            #driver.quit()
+            pass
             
