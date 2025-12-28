@@ -102,9 +102,9 @@ if __name__ == "__main__":
             "Notary",
             "Certification of a signature"
             )
-        page_handeler = PageHandler.PageHandeler(u,driver)
         
-        driver.get("https://agendamentos.mne.gov.pt/en/login")
+     
+        page_handeler = PageHandler.PageHandeler(u,driver)     
         #https://agendamentos.mne.gov.pt/en/login?type=session_expired
         if  driver.current_url =="https://agendamentos.mne.gov.pt/en/login":
             page_handeler.page1()

@@ -24,8 +24,12 @@ class APISetting:
     port=8000
     address="127.0.0.1"
     secret_key = "kamciroqpogh34" 
-    
+@dataclass(frozen=True) 
 class TelegramBotSetting :
     token=TELEGRAM_BOT_API_TOKEN
     chanel1=TELEGRAM_CHANNEL_FOR_RESULTS
     
+    
+@dataclass(frozen=True)
+class UserManagerSetting:
+    database_name="database.sqllite3"

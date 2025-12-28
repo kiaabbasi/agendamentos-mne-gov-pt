@@ -13,6 +13,7 @@ from setings import basepath,PageHandlerSetting
 from typing import Dict
 import random
 import logging
+from UserManager import User
 
 class API():
     base_url = PageHandlerSetting.API_BASE_URL
@@ -36,14 +37,7 @@ class API():
         return rs["status"]==200
         
 
-class User:
-    def __init__(self,username,password,consular_post,category_of_consular_act,consular_act) -> None:
-        self.username = username
-        self.password = password
-        self.consular_post = consular_post
-        self.category_of_consular_act=category_of_consular_act
-        self.consular_act = consular_act 
-        
+
         
         
 class PageHandeler():
