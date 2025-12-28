@@ -7,6 +7,7 @@ from selenium.webdriver.chrome.service import Service
 import time
 import CDP_Contoroler
 import PageHandler
+import UserManager
 
 
 logging.getLogger().setLevel(logging.WARNING)
@@ -94,35 +95,43 @@ if __name__ == "__main__":
             logger.critical("Faild to connect to CDP can not continue")
             exit(1)
             
-       
-        u = PageHandler.User(
+            
+        """u = UserManager.User(
             "khodamorad.mandegarihassanabad@gmail.com",
             "@912119427Aa",
             "Secção Consular da Embaixada de Portugal em Teerão",
             "Notary",
             "Certification of a signature"
-            )
-        
-     
-        page_handeler = PageHandler.PageHandeler(u,driver)     
-        #https://agendamentos.mne.gov.pt/en/login?type=session_expired
-        if  driver.current_url =="https://agendamentos.mne.gov.pt/en/login":
-            page_handeler.page1()
-            time.sleep(1)
+            )"""
+        for u in UserManager.get_all_users():
+            try:
+                page_handeler = PageHandler.PageHandeler(u,driver)     
+                #https://agendamentos.mne.gov.pt/en/login?type=session_expired
+                if  driver.current_url =="https://agendamentos.mne.gov.pt/en/login":
+                    page_handeler.page1()
+                    time.sleep(1)
+                    
             
-       
-        page_handeler.page2()
-        time.sleep(1)
-        page_handeler.page3()
-        time.sleep(1)
-        page_handeler.page4()
-        time.sleep(1)
-        r= page_handeler.page5(5,10,False)
-        PageHandler.API.send_reult_to_server(str(r))
-        
+                page_handeler.page2()
+                time.sleep(1)
+                page_handeler.page3()
+                time.sleep(1)
+                page_handeler.page4()
+                time.sleep(1)
+                r= page_handeler.page5(5,10,False)
+                PageHandler.API.send_reult_to_server(str(r))
+                
+               
+            except Exception as e:
+                logger.error(e,exc_info=True)
+                
+            finally :
+                driver.delete_cookie("user_consent")
+                driver.delete_cookie("cookiesession1")
+                driver.execute_script("window.localStorage.clear();")
         input("the end")
     finally : 
         if driver != None:
-            #driver.quit()
-            pass
+            driver.quit()
+            
             

@@ -11,7 +11,8 @@ class User:
         self.consular_act = consular_act
         self.is_registred = is_registred
 
-
+    def __str__(self) -> str:
+        return f"{self.username}--{self.consular_act}"
 def get_connection():
     return sqlite3.connect(UserManagerSetting.database_name)
 
@@ -92,12 +93,30 @@ def get_user(username: str):
         cur.execute("SELECT * FROM users WHERE username = ?", (username,))
         return cur.fetchone()
 
-
-def get_all_users():
+def get_all_users() -> list[User]:
     with get_connection() as conn:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM users")
-        return cur.fetchall()
+        cur.execute("""
+            SELECT username, password, consular_post, category_of_consular_act, consular_act, is_registred
+            FROM users
+        """)
+        rows = cur.fetchall()
+        return [User(*row) for row in rows]
+
 
 
 initial_actions()
+
+
+if __name__=="__main__":
+    print("This is futcher for  add user on db")
+    u =User(
+        input("User name:"),
+        input("password:"),
+        input("consular_post :"),
+        input("category_of_consular_act:"),
+        input("consular_act:"),
+        
+    )
+    add_user(u)
+    print(u,"saved")
