@@ -150,9 +150,21 @@ class PageHandeler():
             dict_result["days"] = days
             try :
                 if len(days) > 0:
-                    API.send_reult_to_server(f"🟢{month_and_year}\n{days}")
-                else :
-                    API.send_reult_to_server(f"🔴{month_and_year} No Day availble")
+                    API.send_reult_to_server(
+                        f"🟢 {month_and_year}\n"
+                        f"consular_post : {self.user.consular_post}\n"
+                        f"category_of_consular_act : {self.user.category_of_consular_act}\n"
+                        f"consular_act : {self.user.consular_act}\n"
+                        f"available days : {', '.join(map(str, days))}"
+                    )
+                else:
+                    API.send_reult_to_server(
+                        f"🔴 {month_and_year} No day available\n"
+                        f"consular_post : {self.user.consular_post}\n"
+                        f"category_of_consular_act : {self.user.category_of_consular_act}\n"
+                        f"consular_act : {self.user.consular_act}"
+                    )
+                    
             except requests.ConnectionError :
                 logging.error("Faild to send result to api")
             if len(all_dates)>0 and  register:
