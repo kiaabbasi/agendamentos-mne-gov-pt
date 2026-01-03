@@ -92,7 +92,7 @@ def click_captcha_buttons(break_if_true:Optional[Callable]=None)-> bool:
             
             return True
         
-        elif (pos := find_object_on_screen(f'{basepath}assets/no_voice_captcha.png')) != (None, None,0):
+        elif (pos := find_object_on_screen(f'{basepath}assets/no_voice_captcha.png',0.7)) != (None, None,0):
             raise ObjectNotDefindError("voice Capthca is not availble")
         
         elif (pos := find_object_on_screen(f'{basepath}assets/voice captcha butten.png')) != (None, None,0):
@@ -145,6 +145,7 @@ def which_object_is_in_page(path_list : list[str])->tuple[tuple,str]:
     if sorted_items[0][0][0] is None:
         raise ObjectNotDefindError("No object from the list found on the screen")
     return sorted_items[0]
+
 def find_chain_objects_on_objects(path_list: list[str], threshold=0.8) -> tuple[tuple, tuple]:
     """
     path_list:
@@ -153,20 +154,22 @@ def find_chain_objects_on_objects(path_list: list[str], threshold=0.8) -> tuple[
         image2 inside image1
         ...
     threshold: similarity threshold for each matching step
+
     Returns:
         tuple: (top_left, bottom_right) of the last image in the chain within the ORIGINAL image (image0)
         اگر هر مرحله‌ای شکست بخوره: ((None,None), (None,None))
     """
+
     if len(path_list) < 2:
         raise ValueError("path_list must contain at least two images")
 
-    # همیشه روی تصویر اصلی (image0) کار می‌کنیم
+    # تصویر اصلی
     main_image_path = path_list[0]
     main_img = cv2.imread(main_image_path, cv2.IMREAD_GRAYSCALE)
     if main_img is None:
         raise ValueError(f"Could not load main image: {main_image_path}")
 
-    # شروع از کل تصویر اصلی
+    # ROI شروع: کل تصویر
     current_roi = (0, 0, main_img.shape[1], main_img.shape[0])  # x, y, w, h
 
     for template_path in path_list[1:]:
@@ -176,27 +179,38 @@ def find_chain_objects_on_objects(path_list: list[str], threshold=0.8) -> tuple[
 
         th, tw = template_img.shape
 
-        # استخراج ناحیه فعلی از تصویر اصلی
         x, y, w, h = current_roi
         roi_img = main_img[y:y+h, x:x+w]
 
-        # اگر template از ROI بزرگ‌تر بود، شکست
+        # اگر template از ROI بزرگ‌تر بود → شکست
         if th > roi_img.shape[0] or tw > roi_img.shape[1]:
             return (None, None), (None, None)
 
-        # جستجو فقط داخل ROI
+        # match فقط داخل ROI
         res = cv2.matchTemplate(roi_img, template_img, cv2.TM_CCOEFF_NORMED)
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
 
-        if max_val < threshold:
-            return (None, None), (None, None)
-
-        # موقعیت نسبت به ROI
+        # محاسبه قبل از شرط (مشکل اصلی اینجا بود)
         local_top_left = max_loc
-        # تبدیل به مختصات تصویر اصلی
         global_top_left = (x + local_top_left[0], y + local_top_left[1])
 
-        # بروزرسانی ROI برای مرحله بعدی: ناحیه‌ای که template پیدا شده
+        # اگر match ضعیف بود → دیباگ + خروج
+        if max_val < threshold:
+            if DEBUG:
+                print("Chain failed on:", template_path, "score:", max_val)
+                debug_img = cv2.cvtColor(main_img, cv2.COLOR_GRAY2BGR)
+                cv2.rectangle(
+                    debug_img,
+                    (global_top_left[0], global_top_left[1]),
+                    (global_top_left[0] + tw, global_top_left[1] + th),
+                    (0, 0, 255), 2
+                )
+                cv2.imshow("Chain Detection Step (FAILED)", debug_img)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
+            return (None, None), (None, None)
+
+        # موفق → ROI بعدی همین ناحیه
         current_roi = (
             global_top_left[0],
             global_top_left[1],
@@ -204,23 +218,26 @@ def find_chain_objects_on_objects(path_list: list[str], threshold=0.8) -> tuple[
             th
         )
 
+        # اگر بخوای هر مرحله رو ببینی (اختیاری)
         if DEBUG:
             debug_img = cv2.cvtColor(main_img, cv2.COLOR_GRAY2BGR)
-            cv2.rectangle(debug_img, 
-                          (global_top_left[0], global_top_left[1]),
-                          (global_top_left[0] + tw, global_top_left[1] + th),
-                          (0, 255, 0), 2)
+            cv2.rectangle(
+                debug_img,
+                (global_top_left[0], global_top_left[1]),
+                (global_top_left[0] + tw, global_top_left[1] + th),
+                (0, 255, 0), 2
+            )
             cv2.imshow("Chain Detection Step", debug_img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
+            cv2.waitKey(1)
 
-    # در نهایت، موقعیت آخرین template در تصویر اصلی
+    # در نهایت مکان آخرین template
     final_x, final_y, final_w, final_h = current_roi
     final_top_left = (final_x, final_y)
     final_bottom_right = (final_x + final_w, final_y + final_h)
 
     return final_top_left, final_bottom_right
-def find_chain_objects_on_screen(path_list : list[str], threshold=0.9)-> tuple[tuple,tuple]:
+
+def find_chain_objects_on_screen(path_list : list[str], threshold=0.8)-> tuple[tuple,tuple]:
     
     screenshot = pyautogui.screenshot()
 

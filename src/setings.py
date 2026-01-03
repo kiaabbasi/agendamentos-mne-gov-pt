@@ -17,7 +17,7 @@ TELEGRAM_CHANNEL_FOR_RESULTS = os.getenv("TELEGRAM_CHANNEL_FOR_RESULTS")
 class PageHandlerSetting():
     API_BASE_URL="http://127.0.0.1:8000/"
     secret_key = "kamciroqpogh34" 
-    
+    max_month_check=6
     
 @dataclass(frozen=True)    
 class APISetting:

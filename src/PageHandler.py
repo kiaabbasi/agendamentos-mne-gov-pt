@@ -15,6 +15,8 @@ import random
 import logging
 from UserManager import User
 
+
+
 class API():
     base_url = PageHandlerSetting.API_BASE_URL
     sicret_key= PageHandlerSetting.secret_key
@@ -123,56 +125,74 @@ class PageHandeler():
     def page4(self):
         
         e = WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH, '//*[@id="main"]/div/section[3]/div/form/div/button[2]'))) #Next button
-        if self.wdriver.current_url == "https://agendamentos.mne.gov.pt/en/schedule/form/documents":
-            e.click()
-        else :
-            raise ValueError("Wrong elemnt found")
+        #if self.wdriver.current_url == "https://agendamentos.mne.gov.pt/en/schedule/form/documents":
+        e.click()
+        #else :
+            #raise ValueError("Wrong elemnt found")
 
-    def page5(self,deley_start,deley_end,register =False):
-        #TODO complet this
+    def page5(self,deley_start,deley_end,register =False):        
         rtn=[]
         if deley_start > deley_end or deley_start<0:
             raise ValueError("deley_start must be smaler than deley_end")
         
-        previous_month = WebDriverWait(self.wdriver,10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="main"]/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[2]/button[1]')))[0] #previous-month
-        next_month = WebDriverWait(self.wdriver,10).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="main"]/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[2]/button[2]')))[0] #next-month
         going_forward = True
+        month_forward_clicked=0
         while True :
             dict_result:Dict={"user_registered":False}
             
-            month_and_year=self.wdriver.find_element(By.XPATH,'/html/body/div[1]/div/div/main/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[1]').text
+                
+            month_and_year=WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.XPATH, '/html/body/div[1]/div/div/main/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[1]'))).text 
+            
             dict_result["month_and_year"] =month_and_year
             
             all_dates= self.wdriver.find_elements(By.CSS_SELECTOR,'button[name="day"]:not([disabled])')
             days=[h.text for h in all_dates]
             dict_result["days"] = days
-            if len(days) > 0:
-                API.send_reult_to_server(f"🟢{month_and_year}\n{days}")
-            else :
-                API.send_reult_to_server(f"🔴{month_and_year} No Day availble")
-            if register:
+            try :
+                if len(days) > 0:
+                    API.send_reult_to_server(f"🟢{month_and_year}\n{days}")
+                else :
+                    API.send_reult_to_server(f"🔴{month_and_year} No Day availble")
+            except requests.ConnectionError :
+                logging.error("Faild to send result to api")
+            if len(all_dates)>0 and  register:
                 # Click first date avalble
                 all_dates[0].click()    
-                WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.NAME, 'hour-slot'))).click() # Hour
+                WebDriverWait(self.wdriver,10).until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[name="hour-slot"]:not([disabled])'))).click() # Hour
                 
-                self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/section[3]/section/form/div[2]/button[2]').click()
+                self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/section[3]/section/form/div[2]/button[2]').click()#register button
                 dict_result["user_registered"] = True
                 API.send_reult_to_server(f"{self.user.username} has ben registerd on {month_and_year}-{all_dates[0]}")
                 break
-            
-            if going_forward and  next_month.get_attribute("disabled") !="true":
-                next_month.click()
-            elif not going_forward and previous_month.get_attribute("disabled") !="true":
-                previous_month.click()
-                
-            else :
-                going_forward = not going_forward            
-            
             time.sleep(random.randint(deley_start,deley_end))
-            
+            try :
+                previous_month = WebDriverWait(self.wdriver,4).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="main"]/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[2]/button[1]')))[0] #previous-month
+                next_month = WebDriverWait(self.wdriver,4).until(EC.presence_of_all_elements_located((By.XPATH, '//*[@id="main"]/div/section[3]/section/form/section[1]/article/div/div/div[1]/div/div/div/div[2]/button[2]')))[0] #next-month
+                for _ in range(3):
+                    if going_forward and  next_month.get_attribute("disabled") !="true":
+                        next_month.click()
+                        month_forward_clicked+=1
+                        if month_forward_clicked > PageHandlerSetting.max_month_check:
+                            going_forward = not going_forward
+                        break
+                    elif not going_forward and previous_month.get_attribute("disabled") !="true":
+                        previous_month.click()
+                        month_forward_clicked-=1
+                        if month_forward_clicked <= 0:
+                            going_forward = not going_forward
+                        break
+                        
+                    else :
+                        going_forward = not going_forward   
+            except selex.TimeoutException:
+                if self.wdriver.current_url == "https://agendamentos.mne.gov.pt/en/schedule/form/calendar":
+                    
+                    self.wdriver.find_element(By.XPATH,'//*[@id="main"]/div/section[3]/section/form/div[2]/button[1]').click() #Back button
+                    self.page4()
+                else :
+                    break
             rtn.append(dict_result)
         return rtn
-            
 
 
 def solve_captcha(*args, **kwargs):
@@ -192,15 +212,28 @@ def solve_captcha(*args, **kwargs):
                     f.write(chunk)
 
         txt = str(voice_to_text.convert("temp.mp3")).lower()
-        rs= screen_handeler.find_chain_objects_on_screen([f"{basepath}assets/enter_waht_you_hear.png",f"{basepath}assets/text_box_on_enter_what_you_hear.png"])
-        screen_handeler.click_on_object(rs[0],rs[1])
+        for i in range(4):
+            rs= screen_handeler.find_chain_objects_on_screen([f"{basepath}assets/enter_waht_you_hear.png",f"{basepath}assets/text_box_on_enter_what_you_hear.png"])
+            if rs != ((None,None),(None,None)):
+                screen_handeler.click_on_object(rs[0],rs[1],center=True)
+                break
+            time.sleep(1)
+        else:
+            raise Exception("Faild to click elemnt")
         for k in txt:
             pyautogui.keyDown(k)
             time.sleep(0.05)
             pyautogui.keyUp(k)
             time.sleep(0.05)
         time.sleep(1)
-        rs= screen_handeler.find_object_on_screen(f"{basepath}assets/verify.png")
-        screen_handeler.click_on_object(rs[0],rs[1])
+        
+        for i in range(4):
+            rs= screen_handeler.find_object_on_screen(f"{basepath}assets/verify.png")
+            if rs != (None,None):
+                screen_handeler.click_on_object(rs[0],rs[1],center=True)
+                break
+            time.sleep(1)
+        else:
+            raise Exception("Faild to click elemnt")
         
 logging.getLogger().setLevel(logging.DEBUG)

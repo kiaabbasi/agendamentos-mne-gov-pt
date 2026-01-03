@@ -4,3 +4,4 @@ venv/
 src/temp.mp3
 src/help
 src/__pycache__
+*.sqllite3

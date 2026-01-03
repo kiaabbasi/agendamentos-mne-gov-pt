@@ -87,11 +87,14 @@ def update_user(username: str, **kwargs):
         return cur.rowcount > 0
 
 
-def get_user(username: str):
+def get_user(username: str)->User|None:
     with get_connection() as conn:
         cur = conn.cursor()
         cur.execute("SELECT * FROM users WHERE username = ?", (username,))
-        return cur.fetchone()
+        row = cur.fetchone()
+        if row:
+            return User(*row[1:])  # id را حذف کرده‌ایم
+        return None
 
 def get_all_users() -> list[User]:
     with get_connection() as conn:
